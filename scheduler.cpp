@@ -29,7 +29,7 @@ static boost::system_time toPosixTime(const boost::chrono::system_clock::time_po
 }
 #endif
 
-void CScheduler::ServiceQueue()
+void CScheduler::serviceQueue()
 {
     boost::unique_lock<boost::mutex> lock(newTaskMutex);
     ++nThreadsServicingQueue;

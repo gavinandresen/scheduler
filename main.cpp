@@ -59,7 +59,7 @@ int main(int argc, char** argv)
 
     boost::thread_group microThreads;
     for (int i = 0; i < 50; i++)
-        microThreads.create_thread(boost::bind(&CScheduler::ServiceQueue, &microTasks));
+        microThreads.create_thread(boost::bind(&CScheduler::serviceQueue, &microTasks));
 
     boost::mutex counterMutex[10];
     int counter[10] = {0};
@@ -84,7 +84,7 @@ int main(int argc, char** argv)
     now = boost::chrono::system_clock::now();
     // More threads and more tasks:
     for (int i = 0; i < 50; i++)
-        microThreads.create_thread(boost::bind(&CScheduler::ServiceQueue, &microTasks));
+        microThreads.create_thread(boost::bind(&CScheduler::serviceQueue, &microTasks));
     for (int i = 0; i < 1000; i++) {
         boost::chrono::system_clock::time_point t = now + boost::chrono::microseconds(randomMsec(rng));
         boost::chrono::system_clock::time_point tReschedule = now + boost::chrono::microseconds(500 + randomMsec(rng));
@@ -126,7 +126,7 @@ int main(int argc, char** argv)
     CScheduler::Function repeatFunction = boost::bind(repeatStuff, boost::ref(s));
     s.scheduleFromNow(repeatFunction, 4);
 
-    boost::thread* schedulerThread = new boost::thread(boost::bind(&CScheduler::ServiceQueue, &s));
+    boost::thread* schedulerThread = new boost::thread(boost::bind(&CScheduler::serviceQueue, &s));
     boost::this_thread::sleep_for(boost::chrono::seconds(12));
 
     schedulerThread->interrupt();
@@ -150,8 +150,8 @@ int main(int argc, char** argv)
     s.scheduleFromNow(boost::bind(longRunningTask, 11), 0);
 
     boost::thread_group threadGroup;
-    threadGroup.create_thread(boost::bind(&CScheduler::ServiceQueue, &s));
-    threadGroup.create_thread(boost::bind(&CScheduler::ServiceQueue, &s));
+    threadGroup.create_thread(boost::bind(&CScheduler::serviceQueue, &s));
+    threadGroup.create_thread(boost::bind(&CScheduler::serviceQueue, &s));
     boost::this_thread::sleep_for(boost::chrono::seconds(13));
 
     // All threads MUST be terminated before the scheduler's

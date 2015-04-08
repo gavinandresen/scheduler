@@ -24,9 +24,9 @@
 // CScheduler* s = new CScheduler();
 // s->scheduleFromNow(doSomething, 11); // Assuming a: void doSomething() { }
 // s->scheduleFromNow(boost::bind(Class::func, this, argument), 3);
-// boost::thread* t = new boost::thread(boost::bind(CScheduler::ServiceQueue, s));
+// boost::thread* t = new boost::thread(boost::bind(CScheduler::serviceQueue, s));
 //
-// ... then at program shutdown, clean up the thread running ServiceQueue:
+// ... then at program shutdown, clean up the thread running serviceQueue:
 // t->interrupt();
 // t->join();
 // delete t;
@@ -55,7 +55,7 @@ public:
 
     // Services the queue 'forever'. Should be run in a thread,
     // and interrupted using boost::interrupt_thread
-    void ServiceQueue();
+    void serviceQueue();
 
 private:
     std::multimap<boost::chrono::system_clock::time_point, Function> taskQueue;
