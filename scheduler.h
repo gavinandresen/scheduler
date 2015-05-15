@@ -47,8 +47,11 @@ public:
     // Convenience method: call f once deltaSeconds from now
     void scheduleFromNow(Function f, int64_t deltaSeconds);
 
-    // Another convenience method: call f every deltaSeconds forever,
-    // starting deltaSeconds from now:
+    // Another convenience method: call f approximately
+    // every deltaSeconds forever, starting deltaSeconds from now.
+    // To be more precise: every time f is finished, it
+    // is rescheduled to run deltaSeconds later. If you
+    // need more accurate scheduling, don't use this method.
     void scheduleEvery(Function f, int64_t deltaSeconds);
 
     // To keep things as simple as possible, there is no unschedule.
@@ -57,11 +60,23 @@ public:
     // and interrupted using boost::interrupt_thread
     void serviceQueue();
 
+    // Tell any threads running serviceQueue to stop as soon as they're
+    // done servicing whatever task they're currently servicing (drain=false)
+    // or when there is no work left to be done (drain=true)
+    void stop(bool drain=false);
+
+    // Returns number of tasks waiting to be serviced,
+    // and first and last task times
+    size_t getQueueInfo(boost::chrono::system_clock::time_point &first,
+                        boost::chrono::system_clock::time_point &last) const;
+
 private:
     std::multimap<boost::chrono::system_clock::time_point, Function> taskQueue;
     boost::condition_variable newTaskScheduled;
-    boost::mutex newTaskMutex;
+    mutable boost::mutex newTaskMutex;
     int nThreadsServicingQueue;
+    bool stopRequested;
+    bool stopWhenEmpty;
 };
 
 #endif

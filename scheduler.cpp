@@ -8,7 +8,7 @@
 #include <boost/bind.hpp>
 #include <utility>
 
-CScheduler::CScheduler() : nThreadsServicingQueue(0)
+CScheduler::CScheduler() : nThreadsServicingQueue(0), stopRequested(false), stopWhenEmpty(false)
 {
 }
 
@@ -29,29 +29,37 @@ void CScheduler::serviceQueue()
 {
     boost::unique_lock<boost::mutex> lock(newTaskMutex);
     ++nThreadsServicingQueue;
+    stopRequested = false;
+    stopWhenEmpty = false;
 
     // newTaskMutex is locked throughout this loop EXCEPT
     // when the thread is waiting or when the user's function
     // is called.
-    while (1) {
+    while (!stopRequested && !(stopWhenEmpty && taskQueue.empty())) {
         try {
-            while (taskQueue.empty()) {
+            while (!stopRequested && !stopWhenEmpty && taskQueue.empty()) {
                 // Wait until there is something to do.
                 newTaskScheduled.wait(lock);
             }
-// Wait until either there is a new task, or until
-// the time of the first item on the queue:
+
+            // Wait until either there is a new task, or until
+            // the time of the first item on the queue:
 
 // wait_until needs boost 1.50 or later; older versions have timed_wait:
 #if BOOST_VERSION < 105000
-            while (!taskQueue.empty() && newTaskScheduled.timed_wait(lock, toPosixTime(taskQueue.begin()->first)) == true) {
+            while (!stopRequested && !taskQueue.empty() &&
+                   newTaskScheduled.timed_wait(lock, toPosixTime(taskQueue.begin()->first))) {
                 // Keep waiting until timeout
             }
 #else
-            while (!taskQueue.empty() && newTaskScheduled.wait_until(lock, taskQueue.begin()->first) != boost::cv_status::timeout) {
+            while (!stopRequested && !taskQueue.empty() &&
+                   newTaskScheduled.wait_until(lock, taskQueue.begin()->first) != boost::cv_status::timeout) {
                 // Keep waiting until timeout
             }
 #endif
+            if (stopRequested)
+                break;
+
             // If there are multiple threads, the queue can empty while we're waiting (another
             // thread may service the task we were waiting on).
             if (taskQueue.empty())
@@ -70,6 +78,19 @@ void CScheduler::serviceQueue()
             throw;
         }
     }
+    --nThreadsServicingQueue;
+}
+
+void CScheduler::stop(bool drain)
+{
+    {
+        boost::unique_lock<boost::mutex> lock(newTaskMutex);
+        if (drain)
+            stopWhenEmpty = true;
+        else
+            stopRequested = true;
+    }
+    newTaskScheduled.notify_all();
 }
 
 void CScheduler::schedule(CScheduler::Function f, boost::chrono::system_clock::time_point t)
@@ -95,4 +116,16 @@ static void Repeat(CScheduler* s, CScheduler::Function f, int64_t deltaSeconds)
 void CScheduler::scheduleEvery(CScheduler::Function f, int64_t deltaSeconds)
 {
     scheduleFromNow(boost::bind(&Repeat, this, f, deltaSeconds), deltaSeconds);
+}
+
+size_t CScheduler::getQueueInfo(boost::chrono::system_clock::time_point &first,
+                             boost::chrono::system_clock::time_point &last) const
+{
+    boost::unique_lock<boost::mutex> lock(newTaskMutex);
+    size_t result = taskQueue.size();
+    if (!taskQueue.empty()) {
+        first = taskQueue.begin()->first;
+        last = taskQueue.rbegin()->first;
+    }
+    return result;
 }

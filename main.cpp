@@ -95,10 +95,7 @@ int main(int argc, char** argv)
         microTasks.schedule(f, t);
     }
 
-    // All 2,000 tasks should be finished within 2 milliseconds. Sleep a bit longer.
-    boost::this_thread::sleep_for(boost::chrono::microseconds(2100));
-
-    microThreads.interrupt_all();
+    microTasks.stop(true); // Stop after all tasks done
     microThreads.join_all();
 
     std::cout << "Microtask counts: ";
@@ -127,14 +124,10 @@ int main(int argc, char** argv)
     s.scheduleFromNow(repeatFunction, 4);
 
     boost::thread* schedulerThread = new boost::thread(boost::bind(&CScheduler::serviceQueue, &s));
-    boost::this_thread::sleep_for(boost::chrono::seconds(12));
 
-    schedulerThread->interrupt();
-    try {
-        schedulerThread->join();
-    } catch (const boost::thread_interrupted&) {
-        // this is normal.
-    }
+    // Stop after 12 seconds
+    s.scheduleFromNow(boost::bind(&CScheduler::stop, &s, false), 12);
+    schedulerThread->join();
     delete schedulerThread;
 
     // Note: even though the thread terminated, the
